@@ -1468,7 +1468,7 @@ export class SecureAPIClient {
     return this.request<any>(`/api/v1/dashboard/summary?${queryParams}`, requestOptions);
   }
 
-  async getProperties(): Promise<{ properties: { id: string; name: string; timezone: string }[] }> {
+  async getDashboardProperties(): Promise<{ properties: { id: string; name: string; timezone: string }[] }> {
     return this.request<any>('/api/v1/dashboard/properties');
   }
 

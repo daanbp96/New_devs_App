@@ -14,7 +14,7 @@ const Dashboard: React.FC = () => {
   const [propertiesError, setPropertiesError] = useState<string | null>(null);
 
   useEffect(() => {
-    SecureAPI.getProperties()
+    SecureAPI.getDashboardProperties()
       .then(({ properties }) => {
         setProperties(properties);
         if (properties.length > 0) {
