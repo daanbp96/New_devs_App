@@ -14,11 +14,16 @@ def _round_to_cents(value: str) -> float:
     return float(Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
 
 
-@router.get("/dashboard/properties")
-async def get_properties(current_user = Depends(get_current_user)) -> Dict[str, List[Dict[str, Any]]]:
+def _require_tenant(current_user) -> str:
     tenant_id = getattr(current_user, "tenant_id", None)
     if not tenant_id:
         raise HTTPException(status_code=400, detail="No tenant context for user")
+    return tenant_id
+
+
+@router.get("/dashboard/properties")
+async def get_properties(current_user = Depends(get_current_user)) -> Dict[str, List[Dict[str, Any]]]:
+    tenant_id = _require_tenant(current_user)
 
     db_pool = DatabasePool()
     await db_pool.initialize()
@@ -40,11 +45,9 @@ async def get_properties(current_user = Depends(get_current_user)) -> Dict[str, 
 @router.get("/dashboard/summary")
 async def get_dashboard_summary(
     property_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    
-    tenant_id = getattr(current_user, "tenant_id", "default_tenant") or "default_tenant"
-    
+    tenant_id = _require_tenant(current_user)
     revenue_data = await get_revenue_summary(property_id, tenant_id)
 
     return {
@@ -62,10 +65,7 @@ async def get_dashboard_monthly(
     year: int = Query(2024, ge=2000, le=2100),
     current_user = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    tenant_id = getattr(current_user, "tenant_id", None)
-    if not tenant_id:
-        raise HTTPException(status_code=400, detail="No tenant context for user")
-
+    tenant_id = _require_tenant(current_user)
     monthly = await calculate_monthly_revenue(property_id, tenant_id, month, year)
 
     return {
