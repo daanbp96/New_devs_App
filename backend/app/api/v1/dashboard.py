@@ -1,12 +1,17 @@
 from decimal import Decimal, ROUND_HALF_UP
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Dict, Any, List
 from sqlalchemy import text
 from app.services.cache import get_revenue_summary
+from app.services.reservations import calculate_monthly_revenue
 from app.core.auth import authenticate_request as get_current_user
 from app.core.database_pool import DatabasePool
 
 router = APIRouter()
+
+
+def _round_to_cents(value: str) -> float:
+    return float(Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
 
 
 @router.get("/dashboard/properties")
@@ -42,12 +47,32 @@ async def get_dashboard_summary(
     
     revenue_data = await get_revenue_summary(property_id, tenant_id)
 
-    total_decimal = Decimal(revenue_data['total']).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    total_revenue_float = float(total_decimal)
-
     return {
         "property_id": revenue_data['property_id'],
-        "total_revenue": total_revenue_float,
+        "total_revenue": _round_to_cents(revenue_data['total']),
         "currency": revenue_data['currency'],
         "reservations_count": revenue_data['count']
+    }
+
+
+@router.get("/dashboard/monthly")
+async def get_dashboard_monthly(
+    property_id: str,
+    month: int = Query(3, ge=1, le=12),
+    year: int = Query(2024, ge=2000, le=2100),
+    current_user = Depends(get_current_user),
+) -> Dict[str, Any]:
+    tenant_id = getattr(current_user, "tenant_id", None)
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant context for user")
+
+    monthly = await calculate_monthly_revenue(property_id, tenant_id, month, year)
+
+    return {
+        "property_id": monthly["property_id"],
+        "month": monthly["month"],
+        "year": monthly["year"],
+        "total_revenue": _round_to_cents(monthly["total"]),
+        "currency": monthly["currency"],
+        "reservations_count": monthly["count"],
     }
